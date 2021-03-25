@@ -1,0 +1,229 @@
+---
+title: "UN Votes Tidy Tuesday 23-01-2021"
+output: html_notebook
+---
+
+The data this week comes from [Harvard's Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl:1902.1/12379) courtesy of Mine Çetinkaya-Rundel, David Robinson, and Nicholas Goguen-Compagnoni. Data is also available as an [R Package]("https://cran.r-project.org/web/packages/unvotes/unvotes.pdf") `{unvotes}`
+
+
+```{r}
+# Load in packages
+library(tidytuesdayR)
+library(tidyverse)
+library(patchwork)
+library(here)
+library(lubridate)
+library(ggpomological)
+library(tidytext)
+library(sf)
+library(countrycode)
+library(rnaturalearth)
+```
+
+
+```{r}
+# Load in data 
+
+tuesdata <- tidytuesdayR::tt_load('2021-03-23')
+
+unvotes <- tuesdata$unvotes
+roll_calls <- tuesdata$roll_calls
+issues <- tuesdata$issues
+```
+
+
+
+# Map of countries and their voting tendencies
+
+```{r}
+# join country votes with rcid
+un_votes_full <- unvotes %>%
+  left_join(roll_calls, by = "rcid")
+```
+
+
+```{r}
+# join country votes to issues
+prop_yes <- un_votes_full %>%
+  left_join(issues, by = "rcid") %>%
+  # clean up country names not recogniced by countrycode
+  mutate(country = case_when(str_detect(country, "Yemen") ~ "Yemen",
+                             str_detect(country, "German") ~ "Germany",
+                             TRUE ~ country)) %>%
+  filter(year(date) > 1990) %>%
+  group_by(country, issue) %>%
+  # calculate proportion of resolutions each country voted for
+  summarise(total_votes = n(),
+            prop_yes = mean(vote == "yes")) %>%
+  mutate(country_code = countrycode(country, origin = "country.name", destination = "iso3c")) %>%
+  filter(!is.na(issue)) %>%
+  drop_na(country_code)
+  
+# generate world map
+world <- ne_countries(scale = "small", returnclass = "sf")
+
+# plot proportion of yes votes by country as a chloropleth
+map <- world %>%
+  # join unvotes data to spatial data
+  left_join(prop_yes, by = c("brk_a3" = "country_code")) %>%#
+  # remove resolutions not assigned to an issue
+  filter(!is.na(issue)) %>%
+  ggplot() +
+  geom_sf(aes(fill = prop_yes), size = 0.1, colour = "#828585") +
+  # change map projection
+  coord_sf(crs = 54030) +
+  # set colour scale
+  scale_fill_gradient2(low = "#c03728", mid = "#f5c04a", high = "#919c4c", midpoint = 0.5, 
+                       name = "Proportion of \"Yes\" votes", 
+                       guide = "colourbar", 
+                       breaks = c(0.01, 0.5, 1), labels = c("0", "0.5", "1")
+                      ) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0, nbin = 5)) +
+  scale_color_pomological(guide = F) +
+  theme_pomological(base_family = "Reenie Beanie", base_size = 20) +
+  theme(axis.text = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "bottom",
+        legend.box.spacing = unit(-1, 'cm'),
+        legend.margin = margin(0, 0, 0, 0, "cm"),
+        panel.spacing.y = unit(1.3, "lines"),
+        plot.margin = unit(c(0, -0.5, 0, -2), "lines") #top, right, bottom, left
+        ) +
+  facet_wrap(~issue, nrow = 6)
+
+
+```
+
+
+# Plot the number of resolutions in each issue over time 
+
+```{r}
+# Join resolutions to issues 
+issues_resolutions <- issues %>%
+  left_join(roll_calls, by = "rcid") %>%
+  filter(year(date) > 1970) %>%
+  # shorten issue names
+  mutate(issue = recode(issue, "Nuclear weapons and nuclear material" = "Nuclear weapons and material"),
+         issue = str_replace_all(issue, "and", "&"))
+```
+
+
+```{r}
+# Number of resolutions per year split into issue 
+hist <- issues_resolutions %>%
+  ggplot() +
+  aes(x = year(date)) +
+  geom_area(stat = "count", aes(fill = issue)) +
+  # add issue titles inside plot area
+  geom_text(x = 1970, y = 45, 
+            aes(label = issue), 
+            data = issues_resolutions %>% distinct(issue), 
+            hjust = 0, vjust = 1, 
+            family = "Reenie Beanie", size = 7, fontface = "bold", colour = "#4f5157") +
+  scale_fill_pomological() +
+  theme_pomological(base_family = "Reenie Beanie", base_size = 20) +
+  labs(x = "", y = "Number of UN resolutions per year",
+       title = NULL) +
+  facet_wrap(~issue, nrow = 6) +
+  ylim(c(0, 45)) +
+  theme(legend.position = "none", 
+        panel.spacing.x = unit(2, "lines"),
+        strip.text = element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 0, 0.5), "cm"), #top, right, bottom, left
+        panel.border = element_blank()
+        )
+
+```
+
+
+
+# Text analysis
+
+Pick out the keywords from the UN resolutions within each issue by calculating tf-idf. 
+```{r}
+# Obtain tf idf for issues
+issues_tf_idf <- issues %>%
+  left_join(roll_calls, by = "rcid") %>%
+  select(issue, descr) %>%
+  unnest_tokens(word, descr) %>%
+  # remove punctuation and amalgamate certain words
+  mutate(word = str_remove_all(word, "[[:punct:]]"),
+         word = case_when(
+           str_detect(word, "test") ~ "testing",
+           str_detect(word, "weapon") ~ "weapon",
+           str_detect(word, "banning") ~ "ban",
+          TRUE ~ word
+         )) %>%
+  count(word, issue) %>%
+  bind_tf_idf(word, issue, n) %>%
+  arrange(desc(tf_idf)) %>%
+  # remove stopwords, numbers
+  anti_join(stop_words, by = "word") %>%
+  filter(!str_detect(word, "[0-9]"))
+
+
+# issues_top_words <- issues %>%
+#   left_join(roll_calls, by = "rcid") %>%
+#   select(issue, descr) %>%
+#   unnest_tokens(word, descr) %>%
+#   mutate(word = str_remove_all(word, "[[:punct:]]"),
+#          word = case_when(
+#            str_detect(word, "palesti") ~ "palestine",
+#            str_detect(word, "test") ~ "testing",
+#            str_detect(word, "weapon") ~ "weapon",
+#            str_detect(word, "banning") ~ "ban",
+#           TRUE ~ word
+#          )) %>%
+#    anti_join(stop_words, by = "word") %>%
+#   filter(!word %in% c("draft", "resolution")) %>%
+#   count(word, issue) %>%
+#   group_by(issue) %>%
+#   slice_max(n, n = 10)
+
+```
+
+
+```{r}
+# plot of tf_idf for resolutions under each issue 
+tf <- issues_tf_idf %>%
+  group_by(issue) %>%
+  slice_max(tf_idf, n = 9) %>%
+  mutate(word = reorder_within(word, tf_idf, issue)) %>%
+  ungroup() %>%
+  ggplot() +
+  aes(x = tf_idf, y = word, fill = issue) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~issue, scales = "free_y", nrow = 6) +
+  scale_fill_pomological() +
+  scale_x_continuous(breaks = c(0, 0.005), labels = c(0, 0.005)) +
+  theme_pomological(base_family = "Reenie Beanie", base_size = 20) +
+  theme(strip.text = element_blank(),
+        plot.margin = unit(c(0.5, 0, 0, 1), "cm"), #top, right, bottom, left
+        panel.border = element_blank(),
+        axis.ticks.x = element_line(colour = "#828585")
+        ) +
+  scale_y_reordered() +
+  labs(y = NULL, 
+       x = "tf-idf")
+```
+
+
+
+```{r}
+# combine plots using patchwork
+plot <- hist|tf|map
+
+plot<- plot + plot_annotation(
+  title = "UN General Assembly Resolutions Since 1970",
+  subtitle = str_wrap("Using historical UN General Assembly Resolutions data, this visualisation shows the number of resolutions related to each issue over time, the keywords in those resolutions, and the proportion of resolutions each country voted \"yes\" for.", width = 90),
+  theme = theme_pomological(base_family = "Reenie Beanie", base_size = 22)) +
+  plot_layout(widths = c(1, 0.7, 1.5)) +
+  theme(panel.border = element_blank(),
+        panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = NULL)
+
+
+# export as png
+ggsave(here("UN_Votes_23-03-21/plot.png"), plot, height = 12, width = 11)
+```
