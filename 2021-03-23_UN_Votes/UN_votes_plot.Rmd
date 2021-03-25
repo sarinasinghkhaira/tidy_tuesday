@@ -225,5 +225,5 @@ plot<- plot + plot_annotation(
 
 
 # export as png
-ggsave(here("UN_Votes_23-03-21/plot.png"), plot, height = 12, width = 11)
+ggsave(here("2021-03-23_UN_Votes/plot.png"), plot, height = 12, width = 11)
 ```
