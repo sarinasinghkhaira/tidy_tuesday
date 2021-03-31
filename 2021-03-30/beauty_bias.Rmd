@@ -3,7 +3,7 @@ title: "Beauty Bias Tidy Tuesday 30-01-2021"
 output: html_notebook
 ---
 
-The data this week comes from [The Pudding](https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl:1902.1/12379). [This article](https://pudding.cool/2021/03/foundation-names) contains an in-depth analysis of the data with brilliant interactive visualisations.
+The data this week comes from [The Pudding](https://github.com/the-pudding/data/tree/master/foundation-names). [This article](https://pudding.cool/2021/03/foundation-names) contains an in-depth analysis of the data with brilliant interactive visualisations.
 
 
 ```{r}
