@@ -1,0 +1,142 @@
+---
+title: "Deforestation Tidy Tuesday 06-04-2021"
+output: html_notebook
+---
+
+The data this week comes from [Our World In Data](https://ourworldindata.org/forests-and-deforestation) courtesy of Max Roser and Hannah Ritchie. Read more about this data [here](https://ucsdnews.ucsd.edu/feature/deforestation-drives-disease-climate-change-and-its-happening-at-a-rapid-rate)
+
+
+```{r load in packages}
+library(tidytuesdayR)
+library(tidyverse)
+library(here)
+library(lubridate)
+library(tidytext)
+library(ggstream)
+library(ggpomological)
+```
+
+
+```{r load in data}
+tuesdata <- tt_load('2021-04-06')
+
+
+veg_oil <- tuesdata$vegetable_oil
+```
+
+
+```{r}
+#extract global data only 
+veg_oil_plot <- veg_oil%>%
+  filter(str_detect(entity, "World")) %>%
+  # create 'other' category
+  mutate(crop_oil = 
+           recode(crop_oil,
+                  Safflower = "Other",
+                  Sesame = "Other",
+                  Linseed = "Other",
+                  Maize = "Other",
+                  "Palm kernel" = "Palm",
+                  "Coconut (copra)" = "Other",
+                  Groundnut = "Other",
+                  "Cottonseed" = "Other",
+                  "Olive, virgin" = "Other")) %>%
+  group_by(crop_oil, year) %>%
+  summarise(production = sum(production, na.rm = TRUE)) %>%
+  ungroup() %>%
+  # reorder factors
+  mutate(crop_oil = fct_relevel(crop_oil, "Palm", "Soybean", "Sunflower", "Rapeseed", "Other"))
+
+```
+
+
+```{r set plot theme}
+# set colours and fonts
+bckground_col <- "#272d36"
+text_col <- "#F0C8B3"
+title_font_name <- "Capriola"
+text_font_name <- "Nunito Sans Light"
+
+# set theme
+theme_set(theme_void(base_family = title_font_name))
+
+theme_update(
+       panel.background = element_rect(fill = bckground_col,
+                                       colour = NA),
+       plot.background = element_rect(fill = bckground_col, 
+                                      colour = NA),
+       plot.margin = margin(1, 1.5, 0.8, 1, "cm"),
+       plot.title = element_text(family = title_font_name, 
+                                 colour = text_col, 
+                                 hjust = 0, size = 24),
+       plot.subtitle = element_text(family = text_font_name, 
+                                    colour = "grey65", 
+                                    size = 14,
+                                    hjust = 0),
+       plot.caption = element_text(family = text_font_name, 
+                                   colour = text_col, 
+                                   hjust = 1),
+       legend.position = "none",
+       axis.text.x = element_text(color = text_col),
+       axis.ticks.x = element_line(color = text_col, size = 1),
+       axis.ticks.length.x = unit(0.5, units = "cm")
+)
+```
+
+
+
+```{r, fig.width=9, fig.height = 8}
+# set year labels
+axis_labs = c(1961, 2014)
+
+# set labels for each crop oil type
+labs <- tibble(crop_oil = c("Palm", "Soybean", "Sunflower", "Rapeseed", "Other"),
+       year = 2014.5,
+       y_position = c(5e07, 1000, -2.7e07, -4.5e07, -6.75e07),
+       production = c(64, 46, 16, 26, 22)
+       )
+
+# stream plot
+defo_plot <- 
+  veg_oil_plot %>% 
+  
+  ggplot() +
+  
+  aes(x = year, y = production, fill = crop_oil, colour = crop_oil) +
+  
+  geom_stream(bw = 0.7, type = "mirror") +
+  
+  scale_fill_pomological() +
+  
+  scale_color_pomological() +
+  
+  # add crop oil labels
+  geom_text(data = labs, 
+            aes(x = year, y = y_position, 
+                label = paste0(crop_oil, "\n", production, " mt"), 
+                hjust = 0), 
+            family = title_font_name) +
+  
+  # add total 1961 oil production
+  annotate("text", 
+           x = 1960, y = -7.7e07, 
+           label = "Total Vegetable Oil Production\n17.4 mt", 
+           hjust = 0, 
+           family = title_font_name, 
+           colour = text_col) +
+
+  #remove clipping
+  coord_cartesian(clip = "off") +
+  
+  #add year labels
+  scale_x_continuous(breaks = axis_labs, labels = axis_labs) +
+  
+  labs(title = "Global Vegetable Oil Production \n",
+       subtitle = str_wrap("This visualisation shows the increase in global vegetable oil production from 1961-2014. The total amount produced in 2014 for each crop type is indicated in megatonnes (1mt = 1,000,000 tonnes). Palm, soybean, rapeseed and sunflower are the largest current producers of vegetable oil. For the purpose of this visualisation: coconut, sesame, olive oil, linseed, cottonseed and safflower have been grouped together into the \"other\" category, as they have remained relatively constant over the 50 year period.", width = 110),
+       caption = "\n \n \nVisualisation by @SarinaSinghK\nData from @OurWorldInData")
+
+ggsave(here("2021-04-06/deforestation_plot.png"), defo_plot, height = 8, width = 10)
+
+```
+
+
