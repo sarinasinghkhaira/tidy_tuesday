@@ -2,6 +2,13 @@
 
 This repo contains my contributions to [#TidyTuesday](https://github.com/rfordatascience/tidytuesday).
 
+## [2021 Week 15](https://github.com/sarinasinghkhaira/tidy_tuesday/blob/main/2021-04-06/deforestation.Rmd) - Global Vegetable Oil Production
+
+Data: [Our World In Data](https://ourworldindata.org/forests-and-deforestation) courtesy of Hannah Ritchie and Max Roser. 
+[This article](https://ucsdnews.ucsd.edu/feature/deforestation-drives-disease-climate-change-and-its-happening-at-a-rapid-rate) contains an in-depth discussion of the drivers of deforestation. It is important to remember that while the palm oil industry has had a huge environmental impact, it also serves as the highest yielding vegetable crop per unit of land use.
+
+![Global Vegetable Oil Production](/2021-04-06/deforestation_plot.png)
+
 
 ## [2021 Week 14](https://github.com/sarinasinghkhaira/tidy_tuesday/blob/main/2021-03-30/beauty_bias.Rmd) - Bias in Make Up Foundation Shades
 
