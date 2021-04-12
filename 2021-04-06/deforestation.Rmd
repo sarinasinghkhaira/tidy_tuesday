@@ -139,4 +139,11 @@ ggsave(here("2021-04-06/deforestation_plot.png"), defo_plot, height = 8, width =
 
 ```
 
+```{r}
+veg_oil_plot %>%
+  filter(year %in% c(1961, 2014)) %>%
+  mutate(production = production/1000000) %>%
+  pivot_wider(names_from = "year", values_from = "production")
+```
 
+173264325/17443865
