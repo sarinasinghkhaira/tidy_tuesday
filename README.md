@@ -9,7 +9,6 @@ Data: [Our World In Data](https://ourworldindata.org/forests-and-deforestation) 
 
 ![Global Vegetable Oil Production](/2021-04-06/deforestation_plot.png)
 
-
 ## [2021 Week 14](https://github.com/sarinasinghkhaira/tidy_tuesday/blob/main/2021-03-30/beauty_bias.Rmd) - Bias in Make Up Foundation Shades
 
 Data: [The Pudding](https://github.com/the-pudding/data/tree/master/foundation-names)  
